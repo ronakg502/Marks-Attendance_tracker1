@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
+import supabase from "../supabase";
 
 const API = "http://localhost:5000/api";
-const USER_ID = "test-user-id";
 
 const TABS = ["Subjects", "Attendance", "Marks"];
 
@@ -15,7 +15,8 @@ function StatCard({ label, value, color }) {
     );
 }
 
-export default function Dashboard() {
+export default function Dashboard({ user }) {
+    const USER_ID = user?.id;
     const [tab, setTab] = useState("Subjects");
     const [subjects, setSubjects] = useState([]);
     const [newSubject, setNewSubject] = useState("");
@@ -187,6 +188,15 @@ export default function Dashboard() {
                             </button>
                         ))}
                     </nav>
+                    <div className="header-right">
+                        <span className="user-email">{user?.email}</span>
+                        <button
+                            className="btn-logout"
+                            onClick={() => supabase.auth.signOut()}
+                        >
+                            Logout
+                        </button>
+                    </div>
                 </div>
             </header>
 
