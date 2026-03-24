@@ -151,18 +151,19 @@ export default function Dashboard({ user }) {
     const overallAttPct = totalClasses > 0 ? Math.round((totalPresent / totalClasses) * 100) : 0;
 
     const allMarks = Object.values(marksData);
+    const calcTotal = (m) => (((m.test1 || 0) + (m.test2 || 0)) / 2) + (m.final || 0);
     const avgFinal = allMarks.length > 0
-        ? Math.round(allMarks.reduce((a, m) => a + (m.final || 0), 0) / allMarks.length)
+        ? Math.round(allMarks.reduce((a, m) => a + calcTotal(m), 0) / allMarks.length)
         : "—";
 
     const getGrade = (marks) => {
         if (!marks) return "—";
-        const avg = ((marks.test1 || 0) + (marks.test2 || 0) + (marks.final || 0)) / 3;
-        if (avg >= 90) return "A+";
-        if (avg >= 80) return "A";
-        if (avg >= 70) return "B";
-        if (avg >= 60) return "C";
-        if (avg >= 50) return "D";
+        const total = calcTotal(marks);
+        if (total >= 90) return "A+";
+        if (total >= 80) return "A";
+        if (total >= 70) return "B";
+        if (total >= 60) return "C";
+        if (total >= 50) return "D";
         return "F";
     };
 
@@ -320,29 +321,35 @@ export default function Dashboard({ user }) {
                                         </div>
                                         {m && (
                                             <div className="marks-row">
-                                                <span>Test 1: <b>{m.test1 ?? "—"}</b></span>
-                                                <span>Test 2: <b>{m.test2 ?? "—"}</b></span>
-                                                <span>Final: <b>{m.final ?? "—"}</b></span>
+                                                <span>Test 1: <b>{m.test1 ?? "—"}</b>/30</span>
+                                                <span>Test 2: <b>{m.test2 ?? "—"}</b>/30</span>
+                                                <span>Final: <b>{m.final ?? "—"}</b>/70</span>
+                                                <span>Total: <b>{m.test1 != null && m.test2 != null && m.final != null ? Math.round(calcTotal(m)) : "—"}</b>/100</span>
                                             </div>
                                         )}
                                         {!m && <p className="muted small">No marks entered</p>}
                                         {isSelected && (
                                             <div className="marks-form" onClick={(e) => e.stopPropagation()}>
                                                 <div className="marks-inputs">
-                                                    {["test1", "test2", "final"].map((field) => (
-                                                        <div key={field} className="mark-input-group">
-                                                            <label className="mark-label">{field === "final" ? "Final" : field === "test1" ? "Test 1" : "Test 2"}</label>
-                                                            <input
-                                                                className="input small-input"
-                                                                type="number"
-                                                                min="0"
-                                                                max="100"
-                                                                placeholder="0–100"
-                                                                value={marksForm[field]}
-                                                                onChange={(e) => setMarksForm({ ...marksForm, [field]: e.target.value })}
-                                                            />
-                                                        </div>
-                                                    ))}
+                                                    {["test1", "test2", "final"].map((field) => {
+                                                        const isTest = field === "test1" || field === "test2";
+                                                        const maxVal = isTest ? 30 : 70;
+                                                        const label = field === "final" ? `Final (/70)` : field === "test1" ? "Test 1 (/30)" : "Test 2 (/30)";
+                                                        return (
+                                                            <div key={field} className="mark-input-group">
+                                                                <label className="mark-label">{label}</label>
+                                                                <input
+                                                                    className="input small-input"
+                                                                    type="number"
+                                                                    min="0"
+                                                                    max={maxVal}
+                                                                    placeholder={`0–${maxVal}`}
+                                                                    value={marksForm[field]}
+                                                                    onChange={(e) => setMarksForm({ ...marksForm, [field]: e.target.value })}
+                                                                />
+                                                            </div>
+                                                        );
+                                                    })}
                                                 </div>
                                                 <button className="btn-primary mt-2" onClick={saveMarks} disabled={savingMarks}>
                                                     {savingMarks ? "Saving…" : "💾 Save Marks"}
