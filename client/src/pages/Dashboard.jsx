@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import supabase from "../supabase";
 
-const API = "http://localhost:5000/api";
+const API = "https://marks-attendance-tracker1.onrender.com";
 
 const TABS = ["Subjects", "Attendance", "Marks"];
 
