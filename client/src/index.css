@@ -750,3 +750,229 @@ body {
 .btn-logout:hover {
   background: rgba(239, 68, 68, 0.25);
 }
+
+/* ── ATTENDANCE HISTORY ── */
+.att-history-wrap {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.att-history-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 10px;
+}
+
+.att-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.att-history-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.att-history-list::-webkit-scrollbar-track {
+  background: var(--surface);
+}
+
+.att-history-list::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+.att-history-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  transition: background 0.15s;
+}
+
+.att-history-item.present {
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.att-history-item.absent {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.att-history-status {
+  font-weight: 700;
+  font-size: 0.9rem;
+  width: 18px;
+  text-align: center;
+}
+
+.att-history-item.present .att-history-status {
+  color: var(--green);
+}
+
+.att-history-item.absent .att-history-status {
+  color: var(--red);
+}
+
+.att-history-date {
+  flex: 1;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.att-history-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+
+.att-history-item.present .att-history-label {
+  background: rgba(34, 197, 94, 0.15);
+}
+
+.att-history-item.absent .att-history-label {
+  background: rgba(239, 68, 68, 0.15);
+}
+
+/* ── TODO TAB ── */
+.todo-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 48px 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.todo-empty-icon {
+  font-size: 2.5rem;
+  opacity: 0.5;
+}
+
+.todo-progress-bar-wrap {
+  background: var(--border);
+  border-radius: 99px;
+  height: 6px;
+  margin-bottom: 6px;
+  overflow: hidden;
+}
+
+.todo-progress-bar {
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--accent), #a78bfa);
+  transition: width 0.4s ease;
+}
+
+.todo-progress-label {
+  margin-bottom: 16px;
+}
+
+.todo-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.todo-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  transition: border-color 0.2s, opacity 0.2s;
+}
+
+.todo-item:hover {
+  border-color: var(--accent);
+}
+
+.todo-item.todo-done {
+  opacity: 0.55;
+}
+
+.todo-check {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.todo-check:hover {
+  border-color: var(--accent);
+}
+
+.todo-check.todo-check-done {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.todo-text {
+  flex: 1;
+  font-size: 0.93rem;
+  color: var(--text);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.todo-item.todo-done .todo-text {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.todo-delete {
+  background: none;
+  border: none;
+  font-size: 1rem;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+  padding: 2px;
+  flex-shrink: 0;
+}
+
+.todo-item:hover .todo-delete {
+  opacity: 1;
+}
+
+.btn-clear-done {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: #fca5a5;
+  border-radius: 8px;
+  padding: 7px 16px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-clear-done:hover {
+  background: rgba(239, 68, 68, 0.25);
+}

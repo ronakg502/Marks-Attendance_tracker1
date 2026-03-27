@@ -4,7 +4,7 @@ import supabase from "../supabase";
 
 const API = "https://marks-attendance-tracker1.onrender.com/api";
 
-const TABS = ["Subjects", "Attendance", "Marks"];
+const TABS = ["Subjects", "Attendance", "Marks", "Todo"];
 
 function StatCard({ label, value, color }) {
     return (
@@ -27,12 +27,43 @@ export default function Dashboard({ user }) {
     const [selectedSubject, setSelectedSubject] = useState(null);
     const [attendanceSummary, setAttendanceSummary] = useState({});
     const [markingAtt, setMarkingAtt] = useState(false);
+    const [attendanceHistory, setAttendanceHistory] = useState({});
+    const [loadingHistory, setLoadingHistory] = useState(false);
 
     // Marks
     const [marksData, setMarksData] = useState({});
     const [marksForm, setMarksForm] = useState({ test1: "", test2: "", final: "" });
     const [selectedMarksSubject, setSelectedMarksSubject] = useState(null);
     const [savingMarks, setSavingMarks] = useState(false);
+
+    // Todo
+    const TODO_KEY = `todos_${USER_ID}`;
+    const [todos, setTodos] = useState(() => {
+        try {
+            return JSON.parse(localStorage.getItem(`todos_${USER_ID}`) || "[]");
+        } catch { return []; }
+    });
+    const [newTodo, setNewTodo] = useState("");
+
+    // Persist todos to localStorage whenever they change
+    useEffect(() => {
+        localStorage.setItem(TODO_KEY, JSON.stringify(todos));
+    }, [todos, TODO_KEY]);
+
+    const addTodo = () => {
+        if (!newTodo.trim()) return;
+        const item = { id: Date.now(), text: newTodo.trim(), done: false };
+        setTodos((prev) => [item, ...prev]);
+        setNewTodo("");
+    };
+
+    const toggleTodo = (id) => {
+        setTodos((prev) => prev.map((t) => t.id === id ? { ...t, done: !t.done } : t));
+    };
+
+    const deleteTodo = (id) => {
+        setTodos((prev) => prev.filter((t) => t.id !== id));
+    };
 
     // ─── Fetch subjects ─────────────────────────────────────────────
     const fetchSubjects = async () => {
@@ -83,6 +114,50 @@ export default function Dashboard({ user }) {
         try {
             await axios.post(`${API}/attendance/mark`, { subject_id, user_id: USER_ID, status });
             await fetchAttendanceSummary();
+            // refresh history for this subject too
+            await fetchAttendanceHistory(subject_id);
+        } catch (e) {
+            setError("Failed to mark attendance");
+        } finally {
+            setMarkingAtt(false);
+        }
+    };
+
+    // ─── Fetch date-wise history for a subject ───────────────────────
+    const fetchAttendanceHistory = async (subject_id) => {
+        if (attendanceHistory[subject_id]) return; // already loaded
+        setLoadingHistory(true);
+        try {
+            const res = await axios.get(`${API}/attendance/${subject_id}`);
+            setAttendanceHistory((prev) => ({ ...prev, [subject_id]: res.data }));
+        } catch (e) { /* ignore */ } finally {
+            setLoadingHistory(false);
+        }
+    };
+
+    const handleSelectSubject = (subject_id) => {
+        const nowSelected = selectedSubject === subject_id ? null : subject_id;
+        setSelectedSubject(nowSelected);
+        if (nowSelected) fetchAttendanceHistory(nowSelected);
+    };
+
+    // ─── Force-refresh history after marking ────────────────────────
+    const refreshHistory = async (subject_id) => {
+        setLoadingHistory(true);
+        try {
+            const res = await axios.get(`${API}/attendance/${subject_id}`);
+            setAttendanceHistory((prev) => ({ ...prev, [subject_id]: res.data }));
+        } catch (e) { /* ignore */ } finally {
+            setLoadingHistory(false);
+        }
+    };
+
+    const markAttendanceFull = async (subject_id, status) => {
+        setMarkingAtt(true);
+        try {
+            await axios.post(`${API}/attendance/mark`, { subject_id, user_id: USER_ID, status });
+            await fetchAttendanceSummary();
+            await refreshHistory(subject_id);
         } catch (e) {
             setError("Failed to mark attendance");
         } finally {
@@ -173,6 +248,8 @@ export default function Dashboard({ user }) {
         return "att-danger";
     };
 
+    const todoDone = todos.filter((t) => t.done).length;
+
     return (
         <div className="app-bg">
             {/* Header */}
@@ -185,7 +262,7 @@ export default function Dashboard({ user }) {
                     <nav className="tab-nav">
                         {TABS.map((t) => (
                             <button key={t} onClick={() => setTab(t)} className={`tab-btn ${tab === t ? "tab-active" : ""}`}>
-                                {t}
+                                {t === "Todo" ? `✅ Todo${todos.length > 0 ? ` (${todoDone}/${todos.length})` : ""}` : t}
                             </button>
                         ))}
                     </nav>
@@ -262,14 +339,15 @@ export default function Dashboard({ user }) {
                 {tab === "Attendance" && (
                     <section className="panel">
                         <h2 className="panel-title">✅ Attendance</h2>
-                        <p className="muted mb-4">Select a subject and mark today's attendance.</p>
+                        <p className="muted mb-4">Select a subject to mark attendance and view history.</p>
                         <div className="subject-list">
                             {subjects.map((s) => {
                                 const att = attendanceSummary[s.id];
                                 const pct = att ? att.percentage : 0;
                                 const isSelected = selectedSubject === s.id;
+                                const history = attendanceHistory[s.id] || [];
                                 return (
-                                    <div key={s.id} className={`att-row ${isSelected ? "att-row-selected" : ""}`} onClick={() => setSelectedSubject(isSelected ? null : s.id)}>
+                                    <div key={s.id} className={`att-row ${isSelected ? "att-row-selected" : ""}`} onClick={() => handleSelectSubject(s.id)}>
                                         <div className="att-info">
                                             <span className="subject-name">{s.subject_name}</span>
                                             {att ? (
@@ -286,13 +364,39 @@ export default function Dashboard({ user }) {
                                             </div>
                                         )}
                                         {isSelected && (
-                                            <div className="att-actions" onClick={(e) => e.stopPropagation()}>
-                                                <button className="btn-present" onClick={() => markAttendance(s.id, "present")} disabled={markingAtt}>
-                                                    ✓ Present
-                                                </button>
-                                                <button className="btn-absent" onClick={() => markAttendance(s.id, "absent")} disabled={markingAtt}>
-                                                    ✗ Absent
-                                                </button>
+                                            <div onClick={(e) => e.stopPropagation()}>
+                                                <div className="att-actions">
+                                                    <button className="btn-present" onClick={() => markAttendanceFull(s.id, "present")} disabled={markingAtt}>
+                                                        ✓ Present
+                                                    </button>
+                                                    <button className="btn-absent" onClick={() => markAttendanceFull(s.id, "absent")} disabled={markingAtt}>
+                                                        ✗ Absent
+                                                    </button>
+                                                </div>
+
+                                                {/* ── Attendance Date History ── */}
+                                                <div className="att-history-wrap">
+                                                    <div className="att-history-title">📅 Attendance History</div>
+                                                    {loadingHistory && <p className="muted small">Loading history…</p>}
+                                                    {!loadingHistory && history.length === 0 && (
+                                                        <p className="muted small">No records yet for this subject.</p>
+                                                    )}
+                                                    {!loadingHistory && history.length > 0 && (
+                                                        <div className="att-history-list">
+                                                            {history.map((record) => (
+                                                                <div key={record.id} className={`att-history-item ${record.status}`}>
+                                                                    <span className="att-history-status">
+                                                                        {record.status === "present" ? "✓" : "✗"}
+                                                                    </span>
+                                                                    <span className="att-history-date">{record.date}</span>
+                                                                    <span className={`att-history-label ${record.status === "present" ? "att-good" : "att-danger"}`}>
+                                                                        {record.status === "present" ? "Present" : "Absent"}
+                                                                    </span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                         )}
                                     </div>
@@ -361,6 +465,75 @@ export default function Dashboard({ user }) {
                             })}
                             {subjects.length === 0 && <p className="muted">Add subjects first from the Subjects tab.</p>}
                         </div>
+                    </section>
+                )}
+
+                {/* ── TODO TAB ── */}
+                {tab === "Todo" && (
+                    <section className="panel">
+                        <h2 className="panel-title">📋 Todo List</h2>
+                        <div className="add-row">
+                            <input
+                                className="input"
+                                placeholder="Add a new task..."
+                                value={newTodo}
+                                onChange={(e) => setNewTodo(e.target.value)}
+                                onKeyDown={(e) => e.key === "Enter" && addTodo()}
+                            />
+                            <button className="btn-primary" onClick={addTodo}>
+                                + Add Task
+                            </button>
+                        </div>
+
+                        {todos.length === 0 && (
+                            <div className="todo-empty">
+                                <span className="todo-empty-icon">📝</span>
+                                <p>No tasks yet. Add your first task above!</p>
+                            </div>
+                        )}
+
+                        {todos.length > 0 && (
+                            <>
+                                <div className="todo-progress-bar-wrap">
+                                    <div
+                                        className="todo-progress-bar"
+                                        style={{ width: `${Math.round((todoDone / todos.length) * 100)}%` }}
+                                    />
+                                </div>
+                                <p className="todo-progress-label muted small">
+                                    {todoDone} of {todos.length} tasks completed
+                                </p>
+                                <ul className="todo-list">
+                                    {todos.map((t) => (
+                                        <li key={t.id} className={`todo-item ${t.done ? "todo-done" : ""}`}>
+                                            <button
+                                                className={`todo-check ${t.done ? "todo-check-done" : ""}`}
+                                                onClick={() => toggleTodo(t.id)}
+                                                aria-label="Toggle task"
+                                            >
+                                                {t.done ? "✓" : ""}
+                                            </button>
+                                            <span className="todo-text">{t.text}</span>
+                                            <button
+                                                className="todo-delete"
+                                                onClick={() => deleteTodo(t.id)}
+                                                aria-label="Delete task"
+                                            >
+                                                🗑
+                                            </button>
+                                        </li>
+                                    ))}
+                                </ul>
+                                {todoDone > 0 && (
+                                    <button
+                                        className="btn-clear-done"
+                                        onClick={() => setTodos((prev) => prev.filter((t) => !t.done))}
+                                    >
+                                        🗑 Clear completed ({todoDone})
+                                    </button>
+                                )}
+                            </>
+                        )}
                     </section>
                 )}
             </main>
