@@ -36,47 +36,79 @@ export default function Dashboard({ user }) {
     const [selectedMarksSubject, setSelectedMarksSubject] = useState(null);
     const [savingMarks, setSavingMarks] = useState(false);
 
-    // Todo
-    const TODO_KEY = `todos_${USER_ID}`;
-    const [todos, setTodos] = useState(() => {
-        try {
-            return JSON.parse(localStorage.getItem(`todos_${USER_ID}`) || "[]");
-        } catch { return []; }
-    });
+    // Todo — uses Supabase client directly for cross-device sync
+    const [todos, setTodos] = useState([]);
     const [newTodo, setNewTodo] = useState("");
+    const [loadingTodos, setLoadingTodos] = useState(false);
 
-    // Persist todos to localStorage whenever they change
-    useEffect(() => {
-        localStorage.setItem(TODO_KEY, JSON.stringify(todos));
-    }, [todos, TODO_KEY]);
+    const fetchTodos = async () => {
+        if (!USER_ID) return;
+        setLoadingTodos(true);
+        const { data, error: err } = await supabase
+            .from("todos")
+            .select("*")
+            .eq("user_id", USER_ID)
+            .order("created_at", { ascending: false });
+        if (!err) setTodos(data || []);
+        else setError("Failed to fetch todos: " + err.message);
+        setLoadingTodos(false);
+    };
 
-    const addTodo = () => {
+    const addTodo = async () => {
         if (!newTodo.trim()) return;
-        const item = { id: Date.now(), text: newTodo.trim(), done: false };
-        setTodos((prev) => [item, ...prev]);
+        const text = newTodo.trim();
         setNewTodo("");
+        const { data, error: err } = await supabase
+            .from("todos")
+            .insert([{ user_id: USER_ID, text, done: false }])
+            .select()
+            .single();
+        if (!err && data) setTodos((prev) => [data, ...prev]);
+        else if (err) setError("Failed to add todo: " + err.message);
     };
 
-    const toggleTodo = (id) => {
-        setTodos((prev) => prev.map((t) => t.id === id ? { ...t, done: !t.done } : t));
+    const toggleTodo = async (id, currentDone) => {
+        // Optimistic update
+        setTodos((prev) => prev.map((t) => t.id === id ? { ...t, done: !currentDone } : t));
+        const { error: err } = await supabase
+            .from("todos")
+            .update({ done: !currentDone })
+            .eq("id", id);
+        if (err) {
+            // Revert on failure
+            setTodos((prev) => prev.map((t) => t.id === id ? { ...t, done: currentDone } : t));
+            setError("Failed to update todo: " + err.message);
+        }
     };
 
-    const deleteTodo = (id) => {
+    const deleteTodo = async (id) => {
         setTodos((prev) => prev.filter((t) => t.id !== id));
+        const { error: err } = await supabase
+            .from("todos")
+            .delete()
+            .eq("id", id);
+        if (err) { setError("Failed to delete todo: " + err.message); fetchTodos(); }
     };
 
-    // ─── Fetch subjects ─────────────────────────────────────────────
+    const clearDoneTodos = async () => {
+        setTodos((prev) => prev.filter((t) => !t.done));
+        const { error: err } = await supabase
+            .from("todos")
+            .delete()
+            .eq("user_id", USER_ID)
+            .eq("done", true);
+        if (err) { setError("Failed to clear todos: " + err.message); fetchTodos(); }
+    };
+
+    // ─── Subjects ───────────────────────────────────────────────────
     const fetchSubjects = async () => {
         setLoading(true);
         setError(null);
         try {
             const res = await axios.get(`${API}/subjects/${USER_ID}`);
             setSubjects(Array.isArray(res.data) ? res.data : []);
-        } catch (e) {
-            setError("Failed to fetch subjects");
-        } finally {
-            setLoading(false);
-        }
+        } catch { setError("Failed to fetch subjects"); }
+        finally { setLoading(false); }
     };
 
     const addSubject = async () => {
@@ -85,28 +117,38 @@ export default function Dashboard({ user }) {
             await axios.post(`${API}/subjects/add`, { subject_name: newSubject.trim(), user_id: USER_ID });
             setNewSubject("");
             await fetchSubjects();
-        } catch (e) {
-            setError("Failed to add subject");
-        }
+        } catch { setError("Failed to add subject"); }
     };
 
     const deleteSubject = async (id) => {
-        try {
-            await axios.delete(`${API}/subjects/${id}`);
-            await fetchSubjects();
-        } catch (e) {
-            setError("Failed to delete subject");
-        }
+        try { await axios.delete(`${API}/subjects/${id}`); await fetchSubjects(); }
+        catch { setError("Failed to delete subject"); }
     };
 
-    // ─── Fetch attendance summary ────────────────────────────────────
+    // ─── Attendance ──────────────────────────────────────────────────
     const fetchAttendanceSummary = async () => {
         try {
             const res = await axios.get(`${API}/attendance/summary/${USER_ID}`);
             const map = {};
             res.data.forEach((s) => { map[s.subject_id] = s; });
             setAttendanceSummary(map);
-        } catch (e) { /* ignore */ }
+        } catch { /* ignore */ }
+    };
+
+    // Always fetches fresh — no cache guard
+    const fetchAttendanceHistory = async (subject_id) => {
+        setLoadingHistory(true);
+        try {
+            const res = await axios.get(`${API}/attendance/${subject_id}`);
+            setAttendanceHistory((prev) => ({ ...prev, [subject_id]: res.data }));
+        } catch { /* ignore */ }
+        finally { setLoadingHistory(false); }
+    };
+
+    const handleSelectSubject = (subject_id) => {
+        const next = selectedSubject === subject_id ? null : subject_id;
+        setSelectedSubject(next);
+        if (next) fetchAttendanceHistory(next);
     };
 
     const markAttendance = async (subject_id, status) => {
@@ -114,68 +156,26 @@ export default function Dashboard({ user }) {
         try {
             await axios.post(`${API}/attendance/mark`, { subject_id, user_id: USER_ID, status });
             await fetchAttendanceSummary();
-            // refresh history for this subject too
             await fetchAttendanceHistory(subject_id);
-        } catch (e) {
-            setError("Failed to mark attendance");
-        } finally {
-            setMarkingAtt(false);
-        }
+        } catch { setError("Failed to mark attendance"); }
+        finally { setMarkingAtt(false); }
     };
 
-    // ─── Fetch date-wise history for a subject ───────────────────────
-    const fetchAttendanceHistory = async (subject_id) => {
-        if (attendanceHistory[subject_id]) return; // already loaded
-        setLoadingHistory(true);
-        try {
-            const res = await axios.get(`${API}/attendance/${subject_id}`);
-            setAttendanceHistory((prev) => ({ ...prev, [subject_id]: res.data }));
-        } catch (e) { /* ignore */ } finally {
-            setLoadingHistory(false);
-        }
+    const formatDate = (dateStr) => {
+        if (!dateStr) return "";
+        const d = new Date(dateStr);
+        return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
     };
 
-    const handleSelectSubject = (subject_id) => {
-        const nowSelected = selectedSubject === subject_id ? null : subject_id;
-        setSelectedSubject(nowSelected);
-        if (nowSelected) fetchAttendanceHistory(nowSelected);
-    };
-
-    // ─── Force-refresh history after marking ────────────────────────
-    const refreshHistory = async (subject_id) => {
-        setLoadingHistory(true);
-        try {
-            const res = await axios.get(`${API}/attendance/${subject_id}`);
-            setAttendanceHistory((prev) => ({ ...prev, [subject_id]: res.data }));
-        } catch (e) { /* ignore */ } finally {
-            setLoadingHistory(false);
-        }
-    };
-
-    const markAttendanceFull = async (subject_id, status) => {
-        setMarkingAtt(true);
-        try {
-            await axios.post(`${API}/attendance/mark`, { subject_id, user_id: USER_ID, status });
-            await fetchAttendanceSummary();
-            await refreshHistory(subject_id);
-        } catch (e) {
-            setError("Failed to mark attendance");
-        } finally {
-            setMarkingAtt(false);
-        }
-    };
-
-    // ─── Fetch marks ─────────────────────────────────────────────────
+    // ─── Marks ───────────────────────────────────────────────────────
     const fetchAllMarks = async () => {
         const map = {};
-        await Promise.all(
-            subjects.map(async (s) => {
-                try {
-                    const res = await axios.get(`${API}/marks/${s.id}`);
-                    if (res.data) map[s.id] = res.data;
-                } catch (e) { /* ignore */ }
-            })
-        );
+        await Promise.all(subjects.map(async (s) => {
+            try {
+                const res = await axios.get(`${API}/marks/${s.id}`);
+                if (res.data) map[s.id] = res.data;
+            } catch { /* ignore */ }
+        }));
         setMarksData(map);
     };
 
@@ -191,33 +191,20 @@ export default function Dashboard({ user }) {
                 final: Number(marksForm.final) || null,
             });
             await fetchAllMarks();
-        } catch (e) {
-            setError("Failed to save marks");
-        } finally {
-            setSavingMarks(false);
-        }
+        } catch { setError("Failed to save marks"); }
+        finally { setSavingMarks(false); }
     };
 
     const openMarksForm = (subject) => {
         setSelectedMarksSubject(subject.id);
         const existing = marksData[subject.id];
-        setMarksForm({
-            test1: existing?.test1 ?? "",
-            test2: existing?.test2 ?? "",
-            final: existing?.final ?? "",
-        });
+        setMarksForm({ test1: existing?.test1 ?? "", test2: existing?.test2 ?? "", final: existing?.final ?? "" });
     };
 
     // ─── Effects ─────────────────────────────────────────────────────
+    useEffect(() => { fetchSubjects(); fetchTodos(); }, []);
     useEffect(() => {
-        fetchSubjects();
-    }, []);
-
-    useEffect(() => {
-        if (subjects.length > 0) {
-            fetchAttendanceSummary();
-            fetchAllMarks();
-        }
+        if (subjects.length > 0) { fetchAttendanceSummary(); fetchAllMarks(); }
     }, [subjects]);
 
     // ─── Derived stats ───────────────────────────────────────────────
@@ -233,26 +220,17 @@ export default function Dashboard({ user }) {
 
     const getGrade = (marks) => {
         if (!marks) return "—";
-        const total = calcTotal(marks);
-        if (total >= 90) return "A+";
-        if (total >= 80) return "A";
-        if (total >= 70) return "B";
-        if (total >= 60) return "C";
-        if (total >= 50) return "D";
-        return "F";
+        const t = calcTotal(marks);
+        if (t >= 90) return "A+"; if (t >= 80) return "A"; if (t >= 70) return "B";
+        if (t >= 60) return "C"; if (t >= 50) return "D"; return "F";
     };
 
-    const getAttColor = (pct) => {
-        if (pct >= 75) return "att-good";
-        if (pct >= 50) return "att-warn";
-        return "att-danger";
-    };
+    const getAttColor = (pct) => pct >= 75 ? "att-good" : pct >= 50 ? "att-warn" : "att-danger";
 
     const todoDone = todos.filter((t) => t.done).length;
 
     return (
         <div className="app-bg">
-            {/* Header */}
             <header className="header">
                 <div className="header-inner">
                     <div className="logo">
@@ -268,12 +246,7 @@ export default function Dashboard({ user }) {
                     </nav>
                     <div className="header-right">
                         <span className="user-email">{user?.email}</span>
-                        <button
-                            className="btn-logout"
-                            onClick={() => supabase.auth.signOut()}
-                        >
-                            Logout
-                        </button>
+                        <button className="btn-logout" onClick={() => supabase.auth.signOut()}>Logout</button>
                     </div>
                 </div>
             </header>
@@ -286,7 +259,6 @@ export default function Dashboard({ user }) {
                     </div>
                 )}
 
-                {/* Stat Cards */}
                 <div className="stat-row">
                     <StatCard label="Total Subjects" value={subjects.length} color="card-blue" />
                     <StatCard label="Overall Attendance" value={`${overallAttPct}%`} color={overallAttPct >= 75 ? "card-green" : overallAttPct >= 50 ? "card-yellow" : "card-red"} />
@@ -299,16 +271,10 @@ export default function Dashboard({ user }) {
                     <section className="panel">
                         <h2 className="panel-title">📚 Subjects</h2>
                         <div className="add-row">
-                            <input
-                                className="input"
-                                placeholder="Enter subject name..."
-                                value={newSubject}
+                            <input className="input" placeholder="Enter subject name..." value={newSubject}
                                 onChange={(e) => setNewSubject(e.target.value)}
-                                onKeyDown={(e) => e.key === "Enter" && addSubject()}
-                            />
-                            <button className="btn-primary" onClick={addSubject} disabled={loading}>
-                                + Add Subject
-                            </button>
+                                onKeyDown={(e) => e.key === "Enter" && addSubject()} />
+                            <button className="btn-primary" onClick={addSubject} disabled={loading}>+ Add Subject</button>
                         </div>
                         {loading && <p className="muted">Loading subjects…</p>}
                         <div className="subject-grid">
@@ -318,19 +284,14 @@ export default function Dashboard({ user }) {
                                 return (
                                     <div key={s.id} className="subject-card">
                                         <div className="subject-name">{s.subject_name}</div>
-                                        {att && (
-                                            <div className={`subject-att ${getAttColor(pct)}`}>
-                                                {pct}% attendance ({att.present}/{att.total})
-                                            </div>
-                                        )}
-                                        {!att && <div className="subject-att muted">No attendance yet</div>}
+                                        {att
+                                            ? <div className={`subject-att ${getAttColor(pct)}`}>{pct}% attendance ({att.present}/{att.total})</div>
+                                            : <div className="subject-att muted">No attendance yet</div>}
                                         <button className="btn-danger-sm" onClick={() => deleteSubject(s.id)}>Delete</button>
                                     </div>
                                 );
                             })}
-                            {subjects.length === 0 && !loading && (
-                                <p className="muted">No subjects yet. Add one above!</p>
-                            )}
+                            {subjects.length === 0 && !loading && <p className="muted">No subjects yet. Add one above!</p>}
                         </div>
                     </section>
                 )}
@@ -350,13 +311,9 @@ export default function Dashboard({ user }) {
                                     <div key={s.id} className={`att-row ${isSelected ? "att-row-selected" : ""}`} onClick={() => handleSelectSubject(s.id)}>
                                         <div className="att-info">
                                             <span className="subject-name">{s.subject_name}</span>
-                                            {att ? (
-                                                <span className={`att-badge ${getAttColor(pct)}`}>
-                                                    {pct}% · {att.present}P / {att.absent}A
-                                                </span>
-                                            ) : (
-                                                <span className="att-badge muted">No records</span>
-                                            )}
+                                            {att
+                                                ? <span className={`att-badge ${getAttColor(pct)}`}>{pct}% · {att.present}P / {att.absent}A</span>
+                                                : <span className="att-badge muted">No records</span>}
                                         </div>
                                         {att && (
                                             <div className="progress-bar-wrap">
@@ -366,29 +323,22 @@ export default function Dashboard({ user }) {
                                         {isSelected && (
                                             <div onClick={(e) => e.stopPropagation()}>
                                                 <div className="att-actions">
-                                                    <button className="btn-present" onClick={() => markAttendanceFull(s.id, "present")} disabled={markingAtt}>
-                                                        ✓ Present
-                                                    </button>
-                                                    <button className="btn-absent" onClick={() => markAttendanceFull(s.id, "absent")} disabled={markingAtt}>
-                                                        ✗ Absent
-                                                    </button>
+                                                    <button className="btn-present" onClick={() => markAttendance(s.id, "present")} disabled={markingAtt}>✓ Present</button>
+                                                    <button className="btn-absent" onClick={() => markAttendance(s.id, "absent")} disabled={markingAtt}>✗ Absent</button>
                                                 </div>
-
-                                                {/* ── Attendance Date History ── */}
+                                                {/* Attendance Date History */}
                                                 <div className="att-history-wrap">
                                                     <div className="att-history-title">📅 Attendance History</div>
-                                                    {loadingHistory && <p className="muted small">Loading history…</p>}
+                                                    {loadingHistory && <p className="muted small">Loading…</p>}
                                                     {!loadingHistory && history.length === 0 && (
                                                         <p className="muted small">No records yet for this subject.</p>
                                                     )}
                                                     {!loadingHistory && history.length > 0 && (
                                                         <div className="att-history-list">
-                                                            {history.map((record) => (
-                                                                <div key={record.id} className={`att-history-item ${record.status}`}>
-                                                                    <span className="att-history-status">
-                                                                        {record.status === "present" ? "✓" : "✗"}
-                                                                    </span>
-                                                                    <span className="att-history-date">{record.date}</span>
+                                                            {history.map((record, idx) => (
+                                                                <div key={record.id ?? idx} className={`att-history-item ${record.status}`}>
+                                                                    <span className="att-history-status">{record.status === "present" ? "✓" : "✗"}</span>
+                                                                    <span className="att-history-date">{formatDate(record.date)}</span>
                                                                     <span className={`att-history-label ${record.status === "present" ? "att-good" : "att-danger"}`}>
                                                                         {record.status === "present" ? "Present" : "Absent"}
                                                                     </span>
@@ -436,21 +386,15 @@ export default function Dashboard({ user }) {
                                             <div className="marks-form" onClick={(e) => e.stopPropagation()}>
                                                 <div className="marks-inputs">
                                                     {["test1", "test2", "final"].map((field) => {
-                                                        const isTest = field === "test1" || field === "test2";
+                                                        const isTest = field !== "final";
                                                         const maxVal = isTest ? 30 : 70;
-                                                        const label = field === "final" ? `Final (/70)` : field === "test1" ? "Test 1 (/30)" : "Test 2 (/30)";
+                                                        const label = field === "final" ? "Final (/70)" : field === "test1" ? "Test 1 (/30)" : "Test 2 (/30)";
                                                         return (
                                                             <div key={field} className="mark-input-group">
                                                                 <label className="mark-label">{label}</label>
-                                                                <input
-                                                                    className="input small-input"
-                                                                    type="number"
-                                                                    min="0"
-                                                                    max={maxVal}
-                                                                    placeholder={`0–${maxVal}`}
-                                                                    value={marksForm[field]}
-                                                                    onChange={(e) => setMarksForm({ ...marksForm, [field]: e.target.value })}
-                                                                />
+                                                                <input className="input small-input" type="number" min="0" max={maxVal}
+                                                                    placeholder={`0–${maxVal}`} value={marksForm[field]}
+                                                                    onChange={(e) => setMarksForm({ ...marksForm, [field]: e.target.value })} />
                                                             </div>
                                                         );
                                                     })}
@@ -473,19 +417,14 @@ export default function Dashboard({ user }) {
                     <section className="panel">
                         <h2 className="panel-title">📋 Todo List</h2>
                         <div className="add-row">
-                            <input
-                                className="input"
-                                placeholder="Add a new task..."
-                                value={newTodo}
+                            <input className="input" placeholder="Add a new task..." value={newTodo}
                                 onChange={(e) => setNewTodo(e.target.value)}
-                                onKeyDown={(e) => e.key === "Enter" && addTodo()}
-                            />
-                            <button className="btn-primary" onClick={addTodo}>
-                                + Add Task
-                            </button>
+                                onKeyDown={(e) => e.key === "Enter" && addTodo()} />
+                            <button className="btn-primary" onClick={addTodo}>+ Add Task</button>
                         </div>
 
-                        {todos.length === 0 && (
+                        {loadingTodos && <p className="muted">Loading todos…</p>}
+                        {!loadingTodos && todos.length === 0 && (
                             <div className="todo-empty">
                                 <span className="todo-empty-icon">📝</span>
                                 <p>No tasks yet. Add your first task above!</p>
@@ -495,40 +434,22 @@ export default function Dashboard({ user }) {
                         {todos.length > 0 && (
                             <>
                                 <div className="todo-progress-bar-wrap">
-                                    <div
-                                        className="todo-progress-bar"
-                                        style={{ width: `${Math.round((todoDone / todos.length) * 100)}%` }}
-                                    />
+                                    <div className="todo-progress-bar" style={{ width: `${Math.round((todoDone / todos.length) * 100)}%` }} />
                                 </div>
-                                <p className="todo-progress-label muted small">
-                                    {todoDone} of {todos.length} tasks completed
-                                </p>
+                                <p className="todo-progress-label muted small">{todoDone} of {todos.length} tasks completed</p>
                                 <ul className="todo-list">
                                     {todos.map((t) => (
                                         <li key={t.id} className={`todo-item ${t.done ? "todo-done" : ""}`}>
-                                            <button
-                                                className={`todo-check ${t.done ? "todo-check-done" : ""}`}
-                                                onClick={() => toggleTodo(t.id)}
-                                                aria-label="Toggle task"
-                                            >
+                                            <button className={`todo-check ${t.done ? "todo-check-done" : ""}`} onClick={() => toggleTodo(t.id, t.done)}>
                                                 {t.done ? "✓" : ""}
                                             </button>
                                             <span className="todo-text">{t.text}</span>
-                                            <button
-                                                className="todo-delete"
-                                                onClick={() => deleteTodo(t.id)}
-                                                aria-label="Delete task"
-                                            >
-                                                🗑
-                                            </button>
+                                            <button className="todo-delete" onClick={() => deleteTodo(t.id)}>🗑</button>
                                         </li>
                                     ))}
                                 </ul>
                                 {todoDone > 0 && (
-                                    <button
-                                        className="btn-clear-done"
-                                        onClick={() => setTodos((prev) => prev.filter((t) => !t.done))}
-                                    >
+                                    <button className="btn-clear-done" onClick={clearDoneTodos}>
                                         🗑 Clear completed ({todoDone})
                                     </button>
                                 )}
