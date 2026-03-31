@@ -587,16 +587,54 @@ body {
   .header-inner {
     flex-direction: column;
     height: auto;
-    padding: 12px;
-    gap: 10px;
+    padding: 12px 16px;
+    gap: 8px;
+    align-items: stretch;
+  }
+
+  .logo {
+    justify-content: center;
+  }
+
+  .tab-nav {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .header-right {
+    justify-content: center;
+  }
+
+  .user-email {
+    max-width: 160px;
   }
 
   .main-content {
     padding: 16px;
   }
 
+  /* Stack add-button below input on mobile */
+  .add-row {
+    flex-direction: column;
+  }
+
+  .add-row .btn-primary {
+    width: 100%;
+  }
+
   .marks-inputs {
     flex-direction: column;
+  }
+
+  /* Always show delete button on touch screens */
+  .todo-delete {
+    opacity: 1;
+  }
+
+  /* Reduce marks-row wrapping on small screens */
+  .marks-row {
+    flex-wrap: wrap;
+    gap: 8px;
   }
 }
 
@@ -606,8 +644,20 @@ body {
   }
 
   .tab-btn {
-    padding: 6px 12px;
-    font-size: 0.8rem;
+    padding: 6px 10px;
+    font-size: 0.78rem;
+  }
+
+  .panel {
+    padding: 18px 14px;
+  }
+
+  .stat-card {
+    padding: 14px;
+  }
+
+  .stat-value {
+    font-size: 1.6rem;
   }
 }
 
