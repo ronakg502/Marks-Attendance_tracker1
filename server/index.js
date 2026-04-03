@@ -19,6 +19,8 @@ app.use("/api/subjects", require("./routes/subjectRoutes"));
 app.use("/api/attendance", require("./routes/attendanceRoutes"));
 app.use("/api/marks", require("./routes/marksRoutes"));
 app.use("/api/todos", require("./routes/todoRoutes"));
+app.use("/api/mark-components", require("./routes/markComponentRoutes"));
+app.use("/api/mark-entries", require("./routes/markEntryRoutes"));
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on ${PORT}`));

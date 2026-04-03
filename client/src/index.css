@@ -470,17 +470,17 @@ body {
 
 /* ── MARKS GRID ── */
 .marks-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .marks-card {
   background: var(--surface2);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 18px;
-  transition: border-color 0.2s;
+  overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .marks-card:hover {
@@ -489,7 +489,7 @@ body {
 
 .marks-card-selected {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25);
 }
 
 .marks-card-header {
@@ -497,85 +497,203 @@ body {
   justify-content: space-between;
   align-items: center;
   cursor: pointer;
-  margin-bottom: 10px;
+  padding: 16px 20px;
+  transition: background 0.15s;
+}
+
+.marks-card-header:hover {
+  background: rgba(99, 102, 241, 0.06);
+}
+
+.marks-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.marks-chevron {
+  font-size: 0.7rem;
+  color: var(--muted);
+  margin-left: 4px;
+}
+
+.marks-pct-badge {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--surface);
+  padding: 2px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
 }
 
 .grade-badge {
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 700;
   padding: 2px 12px;
   border-radius: 20px;
+  white-space: nowrap;
 }
 
-.grade-Aplus {
-  background: rgba(34, 197, 94, 0.2);
-  color: var(--green);
+.grade-Aplus { background: rgba(34, 197, 94, 0.2); color: var(--green); }
+.grade-A     { background: rgba(34, 197, 94, 0.15); color: #86efac; }
+.grade-B     { background: rgba(59, 130, 246, 0.15); color: #93c5fd; }
+.grade-C     { background: rgba(234, 179, 8, 0.15); color: var(--yellow); }
+.grade-D     { background: rgba(249, 115, 22, 0.15); color: var(--orange); }
+.grade-F     { background: rgba(239, 68, 68, 0.15); color: var(--red); }
+.grade-—     { background: var(--surface); color: var(--muted); }
+
+/* ── MARKS PANEL BODY ── */
+.marks-panel-body {
+  padding: 0 20px 20px;
+  border-top: 1px solid var(--border);
+  animation: slideDown 0.2s ease;
 }
 
-.grade-A {
-  background: rgba(34, 197, 94, 0.15);
-  color: #86efac;
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
-.grade-B {
-  background: rgba(59, 130, 246, 0.15);
-  color: #93c5fd;
-}
-
-.grade-C {
-  background: rgba(234, 179, 8, 0.15);
-  color: var(--yellow);
-}
-
-.grade-D {
-  background: rgba(249, 115, 22, 0.15);
-  color: var(--orange);
-}
-
-.grade-F {
-  background: rgba(239, 68, 68, 0.15);
-  color: var(--red);
-}
-
-.grade-— {
-  background: var(--surface);
-  color: var(--muted);
-}
-
-.marks-row {
+/* ── COMPONENT LIST ── */
+.components-list {
   display: flex;
-  gap: 16px;
-  font-size: 0.85rem;
-  color: var(--muted);
-  margin-bottom: 8px;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+  margin-bottom: 14px;
 }
 
-.marks-row b {
+.component-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  transition: border-color 0.15s;
+}
+
+.component-row:hover {
+  border-color: var(--accent);
+}
+
+.component-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.component-name {
+  font-weight: 600;
+  font-size: 0.93rem;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.component-max {
+  font-size: 0.8rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.component-pct {
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: var(--surface2);
+  white-space: nowrap;
+}
+
+.component-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.component-actions .small-input {
+  width: 80px;
+  flex: none;
+}
+
+.component-actions .btn-danger-sm {
+  margin-top: 0;
+  padding: 5px 10px;
+}
+
+/* ── MARKS SUMMARY ROW ── */
+.marks-summary-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(99, 102, 241, 0.07);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  margin-bottom: 16px;
+}
+
+.marks-summary-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.marks-summary-value {
+  flex: 1;
+  font-size: 0.9rem;
+  font-weight: 600;
   color: var(--text);
 }
 
-.marks-form {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border);
+/* ── ADD COMPONENT FORM ── */
+.add-component-form {
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  margin-top: 4px;
 }
 
-.marks-inputs {
+.add-component-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+
+.add-component-row {
   display: flex;
   gap: 10px;
+  align-items: center;
 }
 
-.mark-input-group {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  flex: 1;
+.add-component-row .input {
+  padding: 9px 12px;
+  font-size: 0.88rem;
 }
 
-.mark-label {
-  font-size: 0.75rem;
-  color: var(--muted);
-  font-weight: 500;
+.add-component-row .small-input {
+  width: 90px;
+  flex: none;
+}
+
+.add-component-row .btn-primary {
+  padding: 9px 16px;
+  font-size: 0.88rem;
+  white-space: nowrap;
 }
 
 /* ── RESPONSIVE ── */
@@ -622,19 +740,36 @@ body {
     width: 100%;
   }
 
-  .marks-inputs {
-    flex-direction: column;
-  }
-
   /* Always show delete button on touch screens */
   .todo-delete {
     opacity: 1;
   }
 
-  /* Reduce marks-row wrapping on small screens */
-  .marks-row {
-    flex-wrap: wrap;
+  /* Component row stacks on mobile */
+  .component-row {
+    flex-direction: column;
+    align-items: flex-start;
     gap: 8px;
+  }
+
+  .component-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .component-actions .small-input {
+    flex: 1;
+    width: auto;
+  }
+
+  .add-component-row {
+    flex-direction: column;
+  }
+
+  .add-component-row .small-input,
+  .add-component-row .btn-primary {
+    width: 100%;
+    flex: none;
   }
 }
 
